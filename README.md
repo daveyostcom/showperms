@@ -37,7 +37,7 @@ Depends on NuGet packages:
 - [Mono.Posix.NETStandard](https://www.nuget.org/packages/Mono.Posix.NETStandard)
 - [NaturalStringExtensions](https://www.nuget.org/packages/NaturalStringExtensions)
 
-I have tried publishing a self-containd binary for osx-x64.  It runs but not if copied to /usr/local/bin/.
+I have tried publishing a self-containd binary for osx-x64.  It runs but not if copied to /usr/local/bin/. See [stackoverflow](https://stackoverflow.com/questions/77492308/in-net-8-trying-to-build-a-cli-program-with-dotnet-publish).
 
 
 

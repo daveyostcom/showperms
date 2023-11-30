@@ -44,14 +44,14 @@ let statToInfoString stat  : string =
     | Fp.S_IFSOCK -> "s"
     | Fp.S_IFIFO  -> "p"
     | _           -> "?"
-  let r bit = bit        |> pick ("r", "-")
-  let w bit = bit        |> pick ("w", "-")
-  let xUsr  = Fp.S_IXUSR |> pick (pick (("s", "S"), ("x", "-")) Fp.S_ISUID)
-  let xGrp  = Fp.S_IXGRP |> pick (pick (("s", "S"), ("x", "-")) Fp.S_ISGID)
-  let xOth  = Fp.S_IXOTH |> pick (pick (("t", "T"), ("x", "-")) Fp.S_ISVTX)
-  t  +  r Fp.S_IRUSR  +  w Fp.S_IWUSR  +  xUsr
-     +  r Fp.S_IRGRP  +  w Fp.S_IWGRP  +  xGrp
-     +  r Fp.S_IROTH  +  w Fp.S_IWOTH  +  xOth
+  let r    bit = bit |> pick                                  ("r", "-")
+  let w    bit = bit |> pick                                  ("w", "-")
+  let xUsr bit = bit |> pick (Fp.S_ISUID |> pick (("s", "S"), ("x", "-")))
+  let xGrp bit = bit |> pick (Fp.S_ISGID |> pick (("s", "S"), ("x", "-")))
+  let xOth bit = bit |> pick (Fp.S_ISVTX |> pick (("t", "T"), ("x", "-")))
+  t  +  r Fp.S_IRUSR  +  w Fp.S_IWUSR  +  xUsr Fp.S_IXUSR
+     +  r Fp.S_IRGRP  +  w Fp.S_IWGRP  +  xGrp Fp.S_IXGRP
+     +  r Fp.S_IROTH  +  w Fp.S_IWOTH  +  xOth Fp.S_IXOTH
 
 //–––––––––––––––––––––––
 
