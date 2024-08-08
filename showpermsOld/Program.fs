@@ -1,15 +1,29 @@
 ﻿
-open System.IO
+// https://github.com/mono/mono/blob/main/mcs/class/Mono.Posix/Mono.Unix.Native/Syscall.cs
 open Mono.Unix.Native
   type Fp = FilePermissions
 
 open showperms
 
-// I left this older version here because the explore function is a good example
-// of the complicated flags-and-if-else way of doing things.
-// It also intermingles the exploration with the output formatting.
-// By using some cool F# features, this all becomes cleaner and more declarative
-// and thus easier to read and understand.
+// This older version has some hard-to-understand code.  For example,
+// - It uses flags and if-else to select output formatting.
+//   - The choices are implicit, buried in code.
+//   - The new version chooses what to do by matching against named cases.
+// - It intermingles code that explores the file hierarchy with code that renders formatted output.
+//   - The new version splits these into two functions, used as steps in an F# pipeline.
+// The new version uses concise F# features for naming things:
+// - a choice type, a.k.a. discriminated union, with these choices:
+//   - NotFound NameOnly File Dir DirRO DirNA
+//   - Each of these choices carries useful data with it.
+// - two multi-case active pattern functions, which return choices:
+//   - IsDir IsFile
+//   - ReadAndSearch ReadOnly SearchOnly NoAccess
+//   - These choices don’t carry data.
+// Using good names for things, of course, makes code more explicit and understandable.
+// The improvements in the new version can be made more or less in any language, but F# syntax
+// is typically more clean and concise.  The active pattern functions are particularly cool.
+//
+// I recommend diffing the two versions.
 
 // Show permissions for all files and directories within the given paths.
 // If a path does not exist it gets “Error”.
@@ -33,8 +47,8 @@ open showperms
 
 //–––––––––––––––––––––––
 
-let mask  stat bits = (stat: Stat).st_mode &&& bits
-let isSet stat bit  = mask stat bit = bit
+let mask  stat bits = bits &&& (stat: Stat).st_mode
+let isSet stat bits = bits = mask stat bits
 let pick  stat tCase fCase bit = if isSet stat bit then tCase else fCase 
 
 // "drwsr-xr-x"
@@ -61,42 +75,37 @@ let statToInfoString stat  : string =
 
 //–––––––––––––––––––––––
 
-let entriesOf dirPath =
-  let comparator a b = System.NaturalStringComparer().Compare(a, b)
-  System.IO.Directory.GetFileSystemEntries dirPath
-  |> Array.sortWith comparator
-
 /// Yield a string for each file or directory.
-let rec explore path  : string seq = seq {
+let rec exploreAndRender path  : string seq = seq {
   match Syscall.stat path with
   | -1, _    -> yield  $"      Error: %s{path} – %s{Syscall.strerror (Stdlib.GetLastError())}" 
   | _ , stat ->
   let isDir = isSet stat Fp.S_IFDIR
   let slash = if isDir then "/" else ""
   let isReadable = Syscall.access(path, AccessModes.R_OK) = 0
+  let entriesOf dirPath  : string array =
+    let comparator a b = System.NaturalStringComparer().Compare(a, b)
+    System.IO.Directory.GetFileSystemEntries dirPath
+    |> Array.sortWith comparator
   let noAccessChar = if not isDir || isReadable then " " else "!"
   yield $"{statToInfoString stat} {noAccessChar} {path}{slash}"
   if isDir && isReadable then 
     let searchable = Syscall.access(path, AccessModes.X_OK) = 0
     let entries = entriesOf path
-    if searchable then  for path in entries do yield! explore path
+    if searchable then  for path in entries do yield! exploreAndRender path
                   else  for path in entries do yield $"             %s{path}" }
-
-/// From argv make a sequence of strings, one for each file and directory within the given paths.
-let renderFiles argv  : string seq =
-  argv
-  |> Seq.collect explore
 
 //–––––––––––––––––––––––
 
-let pathsToString argv =
+/// From argv make a string containing a line for each file and directory within the given paths.
+let explorePaths argv  : string =
   argv
-  |> renderFiles
+  |> Seq.collect exploreAndRender
   |> String.concat "\n"
 
-let diffFiles runDiff argv =
+let diffFiles runDiff argv  : unit =
   argv
-  |> pathsToString
+  |> explorePaths
   |> runDiff ExpectedOutput.expectedOutput
 
 let diffPathsToString  argv = argv |> diffFiles DiffResults.Diff.runToStringNotIgnoring 
@@ -110,5 +119,5 @@ let main argv =
   | a when a.Length = 0 || a[0] = "--help"  ->  printfn $"Usage: %s{exeName} file ..."
   | a when                 a[0] = "--test"  ->  testFilenames |> diffPathsToString         
   | a when                 a[0] = "--testC" ->  testFilenames |> diffPathsToConsole
-  | argv                                    ->  pathsToString argv |> printfn "%s"
+  | argv                                    ->  explorePaths argv |> printfn "%s"
   0
