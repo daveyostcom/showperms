@@ -29,8 +29,8 @@ open Mono.Unix.Native
 
 //–––––––––––––––––––––––
 
-let mask  stat bits = (stat: Stat).st_mode &&& bits
-let isSet stat bit  = mask stat bit = bit
+let mask  stat bits = bits &&& (stat: Stat).st_mode
+let isSet stat bits = bits = mask stat bits
 let pick  stat tCase fCase bit = if isSet stat bit then tCase else fCase 
 
 // "drwsr-xr-x"
@@ -46,27 +46,16 @@ let statToInfoString stat  : string =
     | Fp.S_IFSOCK -> "s"
     | Fp.S_IFIFO  -> "p"
     | _           -> "?"
-  let r bit = bit        |> pick ("r", "-")
-  let w bit = bit        |> pick ("w", "-")
-  let xUsr  = Fp.S_IXUSR |> pick (pick (("s", "S"), ("x", "-")) Fp.S_ISUID)
-  let xGrp  = Fp.S_IXGRP |> pick (pick (("s", "S"), ("x", "-")) Fp.S_ISGID)
-  let xOth  = Fp.S_IXOTH |> pick (pick (("t", "T"), ("x", "-")) Fp.S_ISVTX)
-  t  +  r Fp.S_IRUSR  +  w Fp.S_IWUSR  +  xUsr
-     +  r Fp.S_IRGRP  +  w Fp.S_IWGRP  +  xGrp
-     +  r Fp.S_IROTH  +  w Fp.S_IWOTH  +  xOth
+  let r    bit = bit |> pick                                  ("r", "-")
+  let w    bit = bit |> pick                                  ("w", "-")
+  let xUsr bit = bit |> pick (Fp.S_ISUID |> pick (("s", "S"), ("x", "-")))
+  let xGrp bit = bit |> pick (Fp.S_ISGID |> pick (("s", "S"), ("x", "-")))
+  let xOth bit = bit |> pick (Fp.S_ISVTX |> pick (("t", "T"), ("x", "-")))
+  t  +  r Fp.S_IRUSR  +  w Fp.S_IWUSR  +  xUsr Fp.S_IXUSR
+     +  r Fp.S_IRGRP  +  w Fp.S_IWGRP  +  xGrp Fp.S_IXGRP
+     +  r Fp.S_IROTH  +  w Fp.S_IWOTH  +  xOth Fp.S_IXOTH
 
 //–––––––––––––––––––––––
-
-let (|IsDir|IsFile|) stat = pick stat IsDir IsFile Fp.S_IFDIR
-
-let (|ReadAndSearch|ReadOnly|SearchOnly|NoAccess|) dirPath =
-  let (|Read  |NoRead  |) dirPath = if Syscall.access(dirPath, AccessModes.R_OK) = 0 then Read   else NoRead
-  let (|Search|NoSearch|) dirPath = if Syscall.access(dirPath, AccessModes.X_OK) = 0 then Search else NoSearch
-  match dirPath, dirPath with
-  | Read  , Search   ->  ReadAndSearch
-  | Read  , NoSearch ->  ReadOnly
-  | NoRead, Search   ->  SearchOnly
-  | NoRead, NoSearch ->  NoAccess
 
 type Info =
 | NotFound of string * Errno // not found (used only for command line args)
@@ -76,13 +65,21 @@ type Info =
 | DirRO    of string * Stat  // directory, readable only; contents have names only
 | DirNA    of string * Stat  // directory, contents not accessible
 
-let entriesOf dirPath =
-  let comparator a b = System.NaturalStringComparer().Compare(a, b)
-  System.IO.Directory.GetFileSystemEntries dirPath
-  |> Array.sortWith comparator
-
 /// Yield an Info for each file or directory.
 let rec explore path  : Info seq = seq {
+  let (|IsDir|IsFile|) stat = pick stat IsDir IsFile Fp.S_IFDIR
+  let (|ReadAndSearch|ReadOnly|SearchOnly|NoAccess|) dirPath =
+    let (|Read  |NoRead  |) dirPath = if Syscall.access(dirPath, AccessModes.R_OK) = 0 then Read   else NoRead
+    let (|Search|NoSearch|) dirPath = if Syscall.access(dirPath, AccessModes.X_OK) = 0 then Search else NoSearch
+    match dirPath, dirPath with
+    | Read  , Search   ->  ReadAndSearch
+    | Read  , NoSearch ->  ReadOnly
+    | NoRead, Search   ->  SearchOnly
+    | NoRead, NoSearch ->  NoAccess
+  let entriesOf dirPath  : string array =
+    let comparator a b = System.NaturalStringComparer().Compare(a, b)
+    System.IO.Directory.GetFileSystemEntries dirPath
+    |> Array.sortWith comparator
   match Syscall.stat path with
   | x, _  when x < 0 ->  yield NotFound (path, Stdlib.GetLastError())
   | _ , stat ->
@@ -104,22 +101,20 @@ let render info  : string =
   | DirRO    (dirPath , stat ) ->  $"%s{statToInfoString stat}   %s{dirPath}/" 
   | DirNA    (dirPath , stat ) ->  $"%s{statToInfoString stat} ! %s{dirPath}/" 
 
-/// From argv make a sequence of strings, one for each file and directory within the given paths.
-let renderFiles argv  : string seq =
+//–––––––––––––––––––––––
+
+/// From argv make a string containing a line for each file and directory within the given paths.
+let explorePaths argv  : string =
   argv
   |> Seq.collect explore
   |> Seq.map render
+  |> String.concat "\n"
 
 //–––––––––––––––––––––––
-
-let pathsToString argv =
-  argv
-  |> renderFiles
-  |> String.concat "\n"
 
 let argv = System.Environment.GetCommandLineArgs() |> Array.skip 2
 do
   let exeName = System.AppDomain.CurrentDomain.FriendlyName
   match argv with
   | a when a.Length = 0 || a[0] = "--help"  ->  printfn $"Usage: %s{exeName} file ..."
-  | argv                                    ->  pathsToString argv |> printfn "%s"
+  | argv                                    ->  explorePaths argv |> printfn "%s"
