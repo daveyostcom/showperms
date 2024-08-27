@@ -5,12 +5,12 @@ open Mono.Unix.Native
 
 open showperms
 
-// This older version has some hard-to-understand code.  For example,
+// This older version has some hard-to-understand code at its core.  For example,
 // - It uses flags and if-else to select output formatting.
 //   - The choices are implicit, buried in code.
-//   - The new version chooses what to do by matching against named cases.
+//   - The newer version chooses what to do by matching against named cases.
 // - It intermingles code that explores the file hierarchy with code that renders formatted output.
-//   - The new version splits these into two functions, used as steps in an F# pipeline.
+//   - The newer version splits these into two functions, used as steps in an F# pipeline.
 // The new version uses concise F# features for naming things:
 // - a choice type, a.k.a. discriminated union, with these choices:
 //   - NotFound NameOnly File Dir DirRO DirNA

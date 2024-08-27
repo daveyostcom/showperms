@@ -5,6 +5,32 @@ open Mono.Unix.Native
 
 open showperms
 
+// The older version has some hard-to-understand code.  For example,
+// - It uses flags and if-else to select output formatting.
+//   - The choices are implicit, buried in code.
+//   - The newer version chooses what to do by matching against named cases.
+// - It intermingles code that explores the file hierarchy with code that renders formatted output.
+//   - The newer version splits these into two functions, used as steps in an F# pipeline.
+// This newer version uses concise F# features for naming things:
+//   - a choice type, a.k.a. discriminated union, with these choices:
+//     - NotFound NameOnly File Dir DirRO DirNA
+//     - Each of these choices
+//       - carries useful data with it
+//       - is a naming opportunity
+//       - is a great place for comments that explain and give examples
+//   - two multi-case active pattern functions, which return choices:
+//     - IsDir IsFile
+//     - ReadAndSearch ReadOnly SearchOnly NoAccess
+//       made from these multi-case active pattern functions
+//       - Read NoRead
+//       - Search NoSearch
+//     These choices don’t carry data, but they could.
+// Using good names for things, of course, makes code more explicit and understandable.
+// Some improvements in this newer version can be made more or less in any language, but F# syntax
+// is typically more clean and concise.  F#’s active pattern functions are particularly cool.
+//
+// I recommend diffing the two versions.
+
 // Show permissions for all files and directories within the given paths.
 // If a path does not exist it gets “Error”.
 // If a dir is not readable, it gets “!”.
@@ -61,7 +87,7 @@ let statToInfoString stat  : string =
 // Dir       directory
 // DirRO     directory, readable only; contents have names only
 // DirNA     directory, contents not accessible
-type Info =
+type Info =                  // Output format:
 | NotFound of string * Errno //       Error: notFound – No such file or directory
 | NameOnly of string         //              testDir/3d/1d                       
 | File     of string * Stat  // -rw-r--r--   testDir/2d/1f                       
