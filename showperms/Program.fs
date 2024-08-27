@@ -55,13 +55,19 @@ let statToInfoString stat  : string =
 
 //–––––––––––––––––––––––
 
+// NotFound  not found (used only for command line args)
+// NameOnly  path was an entry in an unsearchable directory
+// File      file
+// Dir       directory
+// DirRO     directory, readable only; contents have names only
+// DirNA     directory, contents not accessible
 type Info =
-| NotFound of string * Errno // not found (used only for command line args)
-| NameOnly of string         // path was an entry in an unsearchable directory
-| File     of string * Stat  // file
-| Dir      of string * Stat  // directory
-| DirRO    of string * Stat  // directory, readable only; contents have names only
-| DirNA    of string * Stat  // directory, contents not accessible
+| NotFound of string * Errno //       Error: notFound – No such file or directory
+| NameOnly of string         //              testDir/3d/1d                       
+| File     of string * Stat  // -rw-r--r--   testDir/2d/1f                       
+| Dir      of string * Stat  // drwxr-xr-x   testDir/                            
+| DirRO    of string * Stat  // dr--------   testDir/3d/                         
+| DirNA    of string * Stat  // d--------- ! testDir/4d/                         
 
 /// Yield an Info for each file or directory.
 let rec explore path  : Info seq = seq {
