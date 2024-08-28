@@ -69,7 +69,7 @@ type Info =
 | DirRO    of string * Stat  // dr--------   testDir/3d/                         
 | DirNA    of string * Stat  // d--------- ! testDir/4d/                         
 
-/// Yield an Info for each file or directory.
+/// Create a sequence that yields an Info for each file or directory.
 let rec explore path  : Info seq = seq {
   let (|IsDir|IsFile|) stat = pick stat IsDir IsFile Fp.S_IFDIR
   let (|ReadAndSearch|ReadOnly|SearchOnly|NoAccess|) dirPath =
@@ -108,15 +108,15 @@ let render info  : string =
 //–––––––––––––––––––––––
 
 /// From argv make a string containing a line for each file and directory within the given paths.
-let explorePaths argv  : string =
+let explorePaths argv  : string seq =
   argv
   |> Seq.collect explore
   |> Seq.map render
-  |> String.concat "\n"
 
 let diffFiles runDiff argv  : unit =
   argv
   |> explorePaths
+  |> String.concat "\n"
   |> runDiff ExpectedOutput.expectedOutput
 
 let diffPathsToString  argv = argv |> diffFiles DiffResults.Diff.runToStringNotIgnoring 
@@ -130,5 +130,5 @@ let main argv =
   | a when a.Length = 0 || a[0] = "--help"  ->  printfn $"Usage: %s{exeName} file ..."
   | a when                 a[0] = "--test"  ->  testFilenames |> diffPathsToString         
   | a when                 a[0] = "--testC" ->  testFilenames |> diffPathsToConsole
-  | argv                                    ->  explorePaths argv |> printfn "%s"
+  | argv                                    ->  explorePaths argv |> Seq.iter (printfn "%s")
   0
