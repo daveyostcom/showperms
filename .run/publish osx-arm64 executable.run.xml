@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="publish osx-arm64 executable" type="DotNetFolderPublish" factoryName="Publish to folder">
+    <riderPublish configuration="Release" include_native_libs_for_self_extract="true" platform="Any CPU" produce_single_file="true" ready_to_run="true" self_contained="true" target_folder="$PROJECT_DIR$/showperms/publish" target_framework="net9.0" trim_unused_assemblies="true" uuid_high="7569501582700266665" uuid_low="-7662675054165980612">
+      <runtimes>
+        <item value="osx-arm64" />
+      </runtimes>
+    </riderPublish>
+    <method v="2" />
+  </configuration>
+</component>
